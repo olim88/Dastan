@@ -484,7 +484,7 @@ class GridButtons(QWidget):
         return NewMoveOption
     def CreateFaujdarMoveOption(self, direction) ->MoveOption:
         NewMoveOption = MoveOption("faujdar")
-        NewMoveOption.AddToPossibleMoves(Vector(0, -1 * direction))
+        NewMoveOption.AddToPossibleMoves(Vector(0, 1 * direction))
         NewMoveOption.AddToPossibleMoves(Vector(0, -1 * direction))
         NewMoveOption.AddToPossibleMoves(Vector(0, 2 * direction))
         NewMoveOption.AddToPossibleMoves(Vector(0, -2 * direction))
