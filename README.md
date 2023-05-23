@@ -1,6 +1,9 @@
 # Dastan
 dastan game made in python using qt6
 
+# config
+there is a config toml file to configure the modification to the base game on and off by changing the bool.
+
 # why
 I had time to spend on this. so i did somthing and made this ugly code
 
