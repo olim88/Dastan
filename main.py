@@ -2,6 +2,7 @@ import sys
 from typing import NamedTuple
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QPushButton, QSizePolicy, QVBoxLayout,QHBoxLayout,QSpacerItem, QLabel,QMenu,QSplitter,QGroupBox,QLineEdit
 from PyQt6.QtCore import Qt
+import tomllib
 import random
 #main code for the game
 class Vector(NamedTuple):
@@ -51,6 +52,7 @@ class Player():
         self.name = name
         self.direction = direction
         self.moveOptionsQueue = MoveOptionQueue()
+        self.hasSpaceJumped = False
 
     def SameAs(self, otherPlayer: 'Player'):
         if otherPlayer == None:
@@ -61,6 +63,9 @@ class Player():
         return self.moveOptionsQueue.GetQueueAsString()
     def AddMoveOptionToQueue(self, moveOption: MoveOption):
         self.moveOptionsQueue.Add(moveOption)
+    def RandomiseMoveOptions(self):
+        random.shuffle(self.moveOptionsQueue.queue)
+        
     def UpdatePlayerMoveQueue(self, moveOption: MoveOption, index: int):
         self.moveOptionsQueue.MoveItemToBack(moveOption, index)
     def UpdateQueueAfterMove(self, index: int):
@@ -128,10 +133,14 @@ class GridButtons(QWidget):
         super().__init__()
         self.width = 1200
         self.height = 1600
+        #load config value from config.toml file
+        with open("config.toml","rb") as f:
+            self.config = tomllib.load(f)
         self.grid = grid
         self.initUI()
         self.Dastan(noOfPieces)
         self.PlayGame()
+        
 
 
     def initUI(self):
@@ -190,10 +199,19 @@ class GridButtons(QWidget):
         self.MoveThreeButton.setToolTip('take third move from queue (-7 points)')
         self.MoveThreeButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.MoveThreeButton.clicked.connect(self.computerMoveThree)
+        #if sapace jump enabled add button
+        if self.config["moves"]["space_jump_move"]:
+            self.MoveSpaceJumpButton = QPushButton('Do Space Jump', self)
+            self.MoveSpaceJumpButton.setToolTip('do a space jump (you only have 1)')
+            self.MoveSpaceJumpButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.MoveSpaceJumpButton.clicked.connect(self.DoSpaceJump)
+        
         moveMenu.addWidget(self.offerMove)
         moveMenu.addWidget(self.MoveOneButton)
         moveMenu.addWidget(self.MoveTwoButton)
         moveMenu.addWidget(self.MoveThreeButton)
+        if self.config["moves"]["space_jump_move"]:
+            moveMenu.addWidget(self.MoveSpaceJumpButton)
         rightMenu.addLayout(moveMenu)
         # add the queue of moves
         queueMenu = QHBoxLayout()
@@ -262,8 +280,13 @@ class GridButtons(QWidget):
         if self.gameStep == "choose move":
             self.Choice = 3
             self.UpdateGameState("start square")
+    def DoSpaceJump(self):
+        if self.gameStep == "choose move":
+            self.Choice = 4
+            self.UpdateGameState("start square")
 
     def Dastan(self, noOfPieces):
+        
         self.Players = [Player('Player One', 1), Player('Player Two', -1)]
         self.CreateMoveOptions()
         self.CreateMoveOptionOffer()
@@ -272,6 +295,8 @@ class GridButtons(QWidget):
         self.CreateBoard()
         self.CreatePieces(noOfPieces)
         self.CurrentPlayer = self.Players[0]
+        
+        
 
     def PlayGame(self):
         self.gameOver = False
@@ -296,6 +321,11 @@ class GridButtons(QWidget):
                 self.MoveOneButton.setEnabled(True)
                 self.MoveTwoButton.setEnabled(True)
                 self.MoveThreeButton.setEnabled(True)
+                if self.config["moves"]["space_jump_move"]:
+                    if self.CurrentPlayer.hasSpaceJumped == False:
+                        self.MoveSpaceJumpButton.setEnabled(True)
+                    else:
+                        self.MoveSpaceJumpButton.setEnabled(False)
                 self.offerMove.setEnabled(True)
             case "start square":                
                 self.gameStep = "start square"
@@ -303,26 +333,50 @@ class GridButtons(QWidget):
                 self.MoveOneButton.setEnabled(False)
                 self.MoveTwoButton.setEnabled(False)
                 self.MoveThreeButton.setEnabled(False)
+                if self.config["moves"]["space_jump_move"]:
+                    self.MoveSpaceJumpButton.setEnabled(False)
+                    
                 self.offerMove.setEnabled(False)
             case "end square":
                 self.gameStep = "end square"
+                if self.Choice == 4: # its  a space jump so work out random square to finish
+                    self.EndSquare = self.GetSpaceJumpSquare()
+                    self.CurrentPlayer.hasSpaceJumped = False 
+                    self.ComputeTurn()#skipto end   
+                    return                
+
                 self.mainOutput.setText(self.CurrentPlayer.name +": Choose an end square")
                 self.DisplayStateWithMoves(self.StartSquare, self.Choice, self.CurrentPlayer)
             case "done":
                 self.gameStep = "done"
                 self.DisplayFinalScore()
+    def GetSpaceJumpSquare(self) -> Vector:
+        
+        endSquare = Vector(random.randint(0,5),random.randint(0,5))
+        while ( not self.CheckSquareIsValid(endSquare,False) ):
+            endSquare = Vector(random.randint(0,5),random.randint(0,5))
+        return endSquare
 
     def ComputeTurn(self):
-            moveLegal = self.CurrentPlayer.CheckPlayerMove(self.Choice, self.StartSquare, self.EndSquare)
-            if moveLegal == True:
+            if self.config["moves"]["space_jump_move"] and self.Choice == 4:
+                self.CurrentPlayer.hasSpaceJumped = True
                 pointsForCapture = self.CalculatePieceCapturePoints(self.EndSquare)
-                self.CurrentPlayer.ChangeScore(-(self.Choice +(2 * (self.Choice -1))))
-                self.CurrentPlayer.UpdateQueueAfterMove(self.Choice)
                 self.UpdateBoard(self.StartSquare, self.EndSquare)
                 self.UpdatePlayerScore(pointsForCapture)
                 #update score value in GUI
                 self.scorePlayerOne.setText(str(self.Players[0].score))
                 self.scorePlayerTwo.setText(str(self.Players[1].score))
+            else:
+                moveLegal = self.CurrentPlayer.CheckPlayerMove(self.Choice, self.StartSquare, self.EndSquare)
+                if moveLegal == True:
+                    pointsForCapture = self.CalculatePieceCapturePoints(self.EndSquare)
+                    self.CurrentPlayer.ChangeScore(-(self.Choice +(2 * (self.Choice -1))))
+                    self.CurrentPlayer.UpdateQueueAfterMove(self.Choice)
+                    self.UpdateBoard(self.StartSquare, self.EndSquare)
+                    self.UpdatePlayerScore(pointsForCapture)
+                    #update score value in GUI
+                    self.scorePlayerOne.setText(str(self.Players[0].score))
+                    self.scorePlayerTwo.setText(str(self.Players[1].score))
 
 
 
@@ -475,6 +529,9 @@ class GridButtons(QWidget):
         self.MoveOptionOffer.append("jazair")
         self.MoveOptionOffer.append("cuirassier")
         self.MoveOptionOffer.append("chowkidar")
+        #if jump move enabled add it
+        if self.config["moves"]["jump_move"]:
+            self.MoveOptionOffer.append("jump")
     def CreateRyottMoveOption(self, direction) ->MoveOption:
         NewMoveOption = MoveOption("ryott")
         NewMoveOption.AddToPossibleMoves(Vector(0, 1 * direction))
@@ -518,6 +575,12 @@ class GridButtons(QWidget):
         NewMoveOption.AddToPossibleMoves(Vector(0, -2 * direction))        
         
         return NewMoveOption
+    def CreateMoveOptionJump(self, direction) -> MoveOption:
+        NewMoveOption = MoveOption("jump")
+        NewMoveOption.AddToPossibleMoves(Vector(2 * direction, 0))
+        NewMoveOption.AddToPossibleMoves(Vector(-2 * direction, 0))
+
+        return NewMoveOption
     
    
 
@@ -533,6 +596,8 @@ class GridButtons(QWidget):
                 return self.CreateCuirassierMoveOption(direction)
             case "chowkidar":
                 return self.CreateChowkidarMoveOption(direction)
+            case "jump":
+                return self.CreateMoveOptionJump(direction)
             case _:
                 return self.CreateRyottMoveOption(direction)
 
@@ -547,6 +612,14 @@ class GridButtons(QWidget):
         self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("jazair",-1))
         self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("cuirassier",-1))
         self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("chowkidar",-1))
+        #if jump move enabled add it
+        if self.config["moves"]["jump_move"]:
+            self.Players[0].AddMoveOptionToQueue(self.CreateMoveOption("jump",1))
+            self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("jump",-1))
+        #randomise move options if set in config file
+        if self.config["general"]["random_queue"]:
+            self.Players[0].RandomiseMoveOptions()
+            self.Players[1].RandomiseMoveOptions()
 
 
 class MainWindow(QMainWindow):

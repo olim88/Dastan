@@ -1,0 +1,11 @@
+#config for toggling modification made to the game
+[general]
+random_queue = true
+
+
+
+#move options
+[moves]
+space_jump_move = true #tecnicaly diffrent by still a type of move
+charge_move = true
+jump_move = true
