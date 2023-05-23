@@ -1,7 +1,7 @@
 #config for toggling modification made to the game
 [general]
 random_queue = true
-
+block_invalid_move = true
 
 
 #move options

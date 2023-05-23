@@ -12,18 +12,38 @@ class Vector(NamedTuple):
 
 
 class MoveOption():
-    def __init__(self, name):
+    def __init__(self, name, move_reqirement :str = None):
         self.name = name
         self.PossibleMoves = []
+        self.move_reqirement = move_reqirement
     def AddToPossibleMoves(self, move: Vector):
         self.PossibleMoves.append(move)
     def GetName(self):
         return self.name
-    def CheckIfThereIsAMoveToSquare(self, startSquareReference : Vector, FisnishSquareReference: Vector) -> bool:
+    def CheckIfThereIsAMoveToSquare(self, startSquareReference : Vector, FisnishSquareReference: Vector,board ,noRow,noCol) -> bool:
         
-        for move in self.PossibleMoves:
-            if ( (startSquareReference.row + move.row) == FisnishSquareReference.row and (startSquareReference.col + move.col) == FisnishSquareReference.col):
-                return True
+        if (self.move_reqirement == None):
+            for move in self.PossibleMoves:
+                if ( (startSquareReference.row + move.row) == FisnishSquareReference.row and (startSquareReference.col + move.col) == FisnishSquareReference.col):
+                    return True
+        if (self.move_reqirement == "stop by piece"):
+            for move in self.PossibleMoves:
+                if ( (startSquareReference.row + move.row) == FisnishSquareReference.row and (startSquareReference.col + move.col) == FisnishSquareReference.col):
+                    #check if there is a piece in the way
+                    invalid = False
+                    start = -1   if move.row < 0 else 1 
+                    for i in range(start,move.row,start):
+                        if board[(startSquareReference.row+ i)*noRow + startSquareReference.col ].PieceInSquare != None:
+                            invalid = True
+                            break
+                    
+                    for i in range(start,move.col,start):
+                        if board[(startSquareReference.row)*noRow + startSquareReference.col + i ].PieceInSquare != None:
+                            invalid = True
+                            break
+                    if not invalid:
+                        return True
+                
             
         return False
         
@@ -74,9 +94,9 @@ class Player():
         self.moveOptionsQueue.Replace(moveOption,index)
     def ChangeScore(self, change: int):
         self.score += change
-    def CheckPlayerMove(self,pos:int, startSquareReference : Vector, FisnishSquareReference: Vector) -> bool:
+    def CheckPlayerMove(self,pos:int, startSquareReference : Vector, FisnishSquareReference: Vector, board,noRow, noCol) -> bool:
         temp = self.moveOptionsQueue.GetMoveOptionInPosition(pos-1)
-        return temp.CheckIfThereIsAMoveToSquare(startSquareReference, FisnishSquareReference)
+        return temp.CheckIfThereIsAMoveToSquare(startSquareReference, FisnishSquareReference, board, noRow, noCol)
     
 
 class Piece():
@@ -129,15 +149,22 @@ class Kotla(Square):
 
 
 class GridButtons(QWidget):
-    def __init__(self, grid,noOfPieces):
+    def __init__(self, noOfRow, noOfColl,noOfPieces):
         super().__init__()
         self.width = 1200
         self.height = 1600
         #load config value from config.toml file
         with open("config.toml","rb") as f:
             self.config = tomllib.load(f)
-        self.grid = grid
+        #create grid values
+        self.noOfRow = noOfRow
+        self.noOfColl = noOfColl
+        self.grid = []
+        for row in range(noOfRow):
+            self.grid.append([0] * noOfColl)
+        #create ui
         self.initUI()
+        #start the game
         self.Dastan(noOfPieces)
         self.PlayGame()
         
@@ -181,7 +208,7 @@ class GridButtons(QWidget):
         self.offerMove.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Create the menu
         self.index_menu = QMenu()
-        for i in range (1,6):
+        for i in range (1,6): #todo change depending on number of moves
             self.index_menu.addAction("Add At Position: "+str(i))
             self.index_menu.actions()[i-1].triggered.connect(lambda idk, x=i: self.computerOfferMove(x))         
         # Connect the main button to the menu
@@ -248,8 +275,13 @@ class GridButtons(QWidget):
                 self.UpdateGameState("end square")
         elif self.gameStep == "end square":
             self.EndSquare = Vector(row,col)
+            #if need to check move legal check it
+            if self.config["general"]["block_invalid_move"]:
+                moveLegal = self.CurrentPlayer.CheckPlayerMove(self.Choice, self.StartSquare, self.EndSquare,self.Board, self.noOfRow, self.noOfColl)
+                if moveLegal:
+                    self.ComputeTurn()     
             #finish computing the move
-            if self.CheckSquareIsValid(self.EndSquare,False):
+            elif self.CheckSquareIsValid(self.EndSquare,False):
                 self.ComputeTurn()
 
     def computerOfferMove(self,index: int):
@@ -352,9 +384,9 @@ class GridButtons(QWidget):
                 self.DisplayFinalScore()
     def GetSpaceJumpSquare(self) -> Vector:
         
-        endSquare = Vector(random.randint(0,5),random.randint(0,5))
+        endSquare = Vector(random.randint(0,self.noOfRow),random.randint(0,self.noOfColl))
         while ( not self.CheckSquareIsValid(endSquare,False) ):
-            endSquare = Vector(random.randint(0,5),random.randint(0,5))
+            endSquare = Vector(random.randint(0,self.noOfRow),random.randint(0,self.noOfColl))
         return endSquare
 
     def ComputeTurn(self):
@@ -367,7 +399,7 @@ class GridButtons(QWidget):
                 self.scorePlayerOne.setText(str(self.Players[0].score))
                 self.scorePlayerTwo.setText(str(self.Players[1].score))
             else:
-                moveLegal = self.CurrentPlayer.CheckPlayerMove(self.Choice, self.StartSquare, self.EndSquare)
+                moveLegal = self.CurrentPlayer.CheckPlayerMove(self.Choice, self.StartSquare, self.EndSquare,self.Board, self.noOfRow, self.noOfColl)
                 if moveLegal == True:
                     pointsForCapture = self.CalculatePieceCapturePoints(self.EndSquare)
                     self.CurrentPlayer.ChangeScore(-(self.Choice +(2 * (self.Choice -1))))
@@ -477,7 +509,7 @@ class GridButtons(QWidget):
                 text = self.Board[boardIndex].Symbol
                 if self.Board[boardIndex].PieceInSquare != None:
                     text += self.Board[boardIndex].PieceInSquare.Symbol
-                if CurrentPlayer.CheckPlayerMove(Choice, startSquare, Vector(row,col)) and self.CheckSquareIsValid(Vector(row,col),False):
+                if CurrentPlayer.CheckPlayerMove(Choice, startSquare, Vector(row,col),self.Board, self.noOfRow, self.noOfColl) and self.CheckSquareIsValid(Vector(row,col),False):
                     text += "X"
                     
                 button.setText(text)
@@ -532,6 +564,9 @@ class GridButtons(QWidget):
         #if jump move enabled add it
         if self.config["moves"]["jump_move"]:
             self.MoveOptionOffer.append("jump")
+        #if charge move enabled add it
+        if self.config["moves"]["charge_move"]:
+            self.MoveOptionOffer.append("charge")
     def CreateRyottMoveOption(self, direction) ->MoveOption:
         NewMoveOption = MoveOption("ryott")
         NewMoveOption.AddToPossibleMoves(Vector(0, 1 * direction))
@@ -581,7 +616,13 @@ class GridButtons(QWidget):
         NewMoveOption.AddToPossibleMoves(Vector(-2 * direction, 0))
 
         return NewMoveOption
-    
+    def CreateMoveOPtionCharge(self, direction) -> MoveOption:
+        NewMoveOption = MoveOption("charge","stop by piece")
+        for row in range(0,self.noOfRow):            
+            NewMoveOption.AddToPossibleMoves(Vector(row * direction,0))
+
+        return NewMoveOption
+        
    
 
     def CreateMoveOption(self, name,direction):
@@ -598,6 +639,8 @@ class GridButtons(QWidget):
                 return self.CreateChowkidarMoveOption(direction)
             case "jump":
                 return self.CreateMoveOptionJump(direction)
+            case "charge":
+                return self.CreateMoveOPtionCharge(direction)
             case _:
                 return self.CreateRyottMoveOption(direction)
 
@@ -616,6 +659,10 @@ class GridButtons(QWidget):
         if self.config["moves"]["jump_move"]:
             self.Players[0].AddMoveOptionToQueue(self.CreateMoveOption("jump",1))
             self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("jump",-1))
+        #if charge move enabled add it
+        if self.config["moves"]["charge_move"]:
+            self.Players[0].AddMoveOptionToQueue(self.CreateMoveOption("charge",1))
+            self.Players[1].AddMoveOptionToQueue(self.CreateMoveOption("charge",-1))
         #randomise move options if set in config file
         if self.config["general"]["random_queue"]:
             self.Players[0].RandomiseMoveOptions()
@@ -623,9 +670,9 @@ class GridButtons(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, grid):
+    def __init__(self):
         super().__init__()
-        self.gridButtons = GridButtons(grid,4)
+        self.gridButtons = GridButtons(6,6,4)
         self.setCentralWidget(self.gridButtons)
         self.setWindowTitle("Dastan")
         self.width = 1200
@@ -651,8 +698,8 @@ def update_grid(grid_buttons, new_grid):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    grid = generate_grid(6,6)
-    window = MainWindow(grid)
+
+    window = MainWindow()
     window.show()
 
     sys.exit(app.exec())
