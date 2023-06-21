@@ -498,8 +498,8 @@ class GridButtons(QWidget):
     
     def DisplayState(self):
         boardIndex = 0
-        for row in range(len(self.grid)):
-            for col in range(len(self.grid[0])):                
+        for row in range(self.noOfRow):
+            for col in range(self.noOfColl):                
                 button = self.gridLayout.itemAtPosition(row, col).widget()
                 text = self.Board[boardIndex].Symbol
                 if self.Board[boardIndex].PieceInSquare != None:
