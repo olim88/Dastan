@@ -2,10 +2,11 @@
 [general]
 random_queue = true
 block_invalid_move = true
-
+display_total_posible_moves = true
 
 #move options
 [moves]
 space_jump_move = true #tecnicaly diffrent by still a type of move
+earth_quake_move = true
 charge_move = true
 jump_move = true
