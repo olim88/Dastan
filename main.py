@@ -208,7 +208,13 @@ class GridButtons(QWidget):
         self.offerMove.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Create the menu
         self.index_menu = QMenu()
-        for i in range (1,6): #todo change depending on number of moves
+        #queue length depended on config
+        ququeLength = 6
+        if self.config["moves"]["charge_move"]:
+            ququeLength += 1
+        if self.config["moves"]["jump_move"]:
+            ququeLength += 1
+        for i in range (1,ququeLength): #todo change depending on number of moves
             self.index_menu.addAction("Add At Position: "+str(i))
             self.index_menu.actions()[i-1].triggered.connect(lambda idk, x=i: self.computerOfferMove(x))         
         # Connect the main button to the menu
