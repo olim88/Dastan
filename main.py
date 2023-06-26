@@ -238,6 +238,12 @@ class GridButtons(QWidget):
             self.MoveSpaceJumpButton.setToolTip('do a space jump (you only have 1)')
             self.MoveSpaceJumpButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             self.MoveSpaceJumpButton.clicked.connect(self.DoSpaceJump)
+        #if earth quake enabled add button
+        if self.config["moves"]["earth_quake_move"]:
+            self.EarthquakeButton = QPushButton('Create Earthquake', self)
+            self.EarthquakeButton.setToolTip('shuffle up the board (-15 points)')
+            self.EarthquakeButton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.EarthquakeButton.clicked.connect(self.CreateEarthquake)
         
         moveMenu.addWidget(self.offerMove)
         moveMenu.addWidget(self.MoveOneButton)
@@ -245,6 +251,8 @@ class GridButtons(QWidget):
         moveMenu.addWidget(self.MoveThreeButton)
         if self.config["moves"]["space_jump_move"]:
             moveMenu.addWidget(self.MoveSpaceJumpButton)
+        if self.config["moves"]["earth_quake_move"]:
+            moveMenu.addWidget(self.EarthquakeButton)
         rightMenu.addLayout(moveMenu)
         # add the queue of moves
         queueMenu = QHBoxLayout()
@@ -253,6 +261,12 @@ class GridButtons(QWidget):
         queueMenu.addWidget(queueLable)
         queueMenu.addWidget(self.queue)
         rightMenu.addLayout(queueMenu)
+        # add the total moves if enabled
+        if self.config["general"]["display_total_posible_moves"]:
+            totalMoveLable = QLabel('Total posible move options:', self)
+            self.totalMoveCount = QLineEdit(self, readOnly=True)
+            rightMenu.addWidget(totalMoveLable)
+            rightMenu.addWidget(self.totalMoveCount)
 
 
         spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
@@ -322,6 +336,19 @@ class GridButtons(QWidget):
         if self.gameStep == "choose move":
             self.Choice = 4
             self.UpdateGameState("start square")
+    def CreateEarthquake(self):
+        if self.gameStep == "choose move":
+            #create an earthquake
+            for i in range (5):
+                pos1 = Vector(random.randint(0,self.noOfRow-1),random.randint(0,self.noOfColl-1))
+                pos2 = Vector(random.randint(0,self.noOfRow-1),random.randint(0,self.noOfColl-1))
+                self.Board[pos1.col + pos1.row * self.noOfRow ], self.Board[pos2.row * self.noOfRow + pos2.col] = self.Board[pos2.row * self.noOfRow + pos2.col], self.Board[pos1.col + pos1.row * self.noOfRow ]
+            self.DisplayState()
+            #remove score
+            self.CurrentPlayer.ChangeScore(-15)
+            self.scorePlayerOne.setText(str(self.Players[0].score))
+            self.scorePlayerTwo.setText(str(self.Players[1].score))
+
 
     def Dastan(self, noOfPieces):
         
@@ -364,7 +391,11 @@ class GridButtons(QWidget):
                         self.MoveSpaceJumpButton.setEnabled(True)
                     else:
                         self.MoveSpaceJumpButton.setEnabled(False)
+                if self.config["moves"]["earth_quake_move"]:
+                    self.EarthquakeButton.setEnabled(True)
                 self.offerMove.setEnabled(True)
+                if self.config["general"]["display_total_posible_moves"]:
+                    self.updateTotalMoves()
             case "start square":                
                 self.gameStep = "start square"
                 self.mainOutput.setText(self.CurrentPlayer.name +": Choose a start square")
@@ -373,7 +404,8 @@ class GridButtons(QWidget):
                 self.MoveThreeButton.setEnabled(False)
                 if self.config["moves"]["space_jump_move"]:
                     self.MoveSpaceJumpButton.setEnabled(False)
-                    
+                if self.config["moves"]["earth_quake_move"]:
+                    self.EarthquakeButton.setEnabled(False)   
                 self.offerMove.setEnabled(False)
             case "end square":
                 self.gameStep = "end square"
@@ -431,6 +463,10 @@ class GridButtons(QWidget):
             self.gameOver = self.CheckForGameOver()
             if self.gameOver == True:
                 self.UpdateGameState("done")
+    def updateTotalMoves(self):
+        count = 0 
+        self.totalMoveCount.setText(str(count))
+
 
     def UpdateBoard(self, startSquare: Vector, endSquare: Vector):
         startSquareIndex = self.GetIndexOfSquareVec(startSquare)
