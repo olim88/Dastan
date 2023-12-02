@@ -4,6 +4,9 @@ dastan game made in python using qt6
 # config
 there is a config toml file to configure the modification to the base game on and off by changing the bool.
 
+# dependencies
+- pyqt6
+- python version higher than 3.11 (tomlib is needed)
 
 
 # Example images
