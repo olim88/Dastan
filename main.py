@@ -464,8 +464,19 @@ class GridButtons(QWidget):
             if self.gameOver == True:
                 self.UpdateGameState("done")
     def updateTotalMoves(self):
-        count = 0 
-        self.totalMoveCount.setText(str(count))
+        # calculate the total number of moves a player could make and display it
+        total = 0
+        for moveIndex in range (0,3):
+            for rowStart in range(self.noOfRow):
+                for colStart in range(self.noOfColl):
+                    if self.CheckSquareIsValid(Vector(rowStart,colStart),True):
+                        for row in range(self.noOfRow):
+                            for col in range(self.noOfColl):                                                               
+                                if self.CheckSquareIsValid(Vector(row,col),False):
+                                    if self.CurrentPlayer.CheckPlayerMove(moveIndex+1, Vector(rowStart,colStart), Vector(row,col ),self.Board, self.noOfRow, self.noOfColl):
+                                        total += 1
+        self.totalMoveCount.setText(str(total))
+
 
 
     def UpdateBoard(self, startSquare: Vector, endSquare: Vector):
